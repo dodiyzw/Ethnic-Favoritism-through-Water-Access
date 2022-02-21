@@ -1,0 +1,292 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(patchwork)
+library(Zelig)
+```
+
+```{r}
+
+merged_menwomen <- read_csv("../DHS_Data/men_women_merged.csv")
+merged_menwomen <- merged_menwomen %>% mutate(DRINKWTR = case_when(DRINKWTR == "1110" ~ "Dwelling", DRINKWTR == "2100" ~ "Unprotected/open well",
+DRINKWTR == "1120" ~ "yard/plot", 
+DRINKWTR == "1210" ~ "public tap", 
+DRINKWTR == "2200" ~ "protected well", 
+DRINKWTR == "2230" ~ "borehole", 
+DRINKWTR == "3110" ~ "protected spring/surface water", 
+DRINKWTR == "3120" ~ "unprotected spring/surface water", 
+DRINKWTR == "3200" ~ "River/dam/lake",
+DRINKWTR == "4000" ~ "rainwater", 
+DRINKWTR == "5100" ~ "tanker truck", 
+DRINKWTR == "5200" ~ "cart with small tank", 
+DRINKWTR == "5400" ~ "bottled water", 
+DRINKWTR == "6000" ~ "OTHER", TRUE ~ "Missing"))
+
+merged_menwomen <- merged_menwomen %>% mutate(timetowtr = replace(timetowtr, timetowtr == "995", 0 )) %>% filter(timetowtr <= 360 & ethnicity <= 50)
+
+merged_menwomen <- merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, ethnicity == "7" ~ 1, ethnicity == "1" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr <= 30 ~ 1, TRUE ~ 0), urb_status = case_when(urban == "2" ~ 0, TRUE ~ 1)) 
+
+```
+
+```{r}
+merged_menwomen <- merged_menwomen %>% mutate(timetowtr = replace(timetowtr, timetowtr == "995", 0 )) %>% filter(timetowtr <= 360 & ethnicity <= 50)
+
+merged_menwomen <- merged_menwomen %>% mutate(timetowtr = replace(timetowtr, timetowtr == "995", 0 ))
+
+merged_menwomen <- merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, ethnicity == "7" ~ 1, ethnicity == "1" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr <= 30 ~ 1, TRUE ~ 0), urb_status = case_when(urban == "2" ~ 0, TRUE ~ 1)) 
+
+### MODELS ####
+
+probit_2 <- merged_menwomen %>% filter(ethnicity < 91) %>% glm(water_acc ~ ethnic_var , data = ., family = binomial(link = "probit"))
+
+summary(probit_2) #positive significance on ethnic
+
+
+probit_2 <- merged_menwomen %>% filter(ethnicity < 91) %>% glm(water_acc ~ ethnic_var + urb_status , data = ., family = binomial(link = "probit"))
+
+summary(probit_2)
+
+
+probit_2 <- merged_menwomen %>% filter(ethnicity < 91) %>% glm(water_acc ~ ethnic_var + urb_status + GEO_TD2004_2014, data = ., family = binomial(link = "probit"))
+
+summary(probit_2)
+
+probit_3 <- merged_menwomen %>% filter(ethnicity < 91, urb_status == 1) %>% glm(water_acc ~ ethnic_var , data = ., family = binomial(link = "probit"))
+#Negative significance
+summary(probit_3)
+
+probit_3 <- merged_menwomen %>% filter(ethnicity < 91, urb_status == 0) %>% glm(water_acc ~ ethnic_var, data = ., family = binomial(link = "probit"))
+#Significant positive
+
+summary(probit_3)
+
+probit_3 <- merged_menwomen %>% filter(ethnicity < 91, GEO_TD2004_2014 == 1) %>% glm(water_acc ~ ethnic_var + urb_status, data = ., family = binomial(link = "probit"))
+#positive significance. 0.169
+
+summary(probit_3)
+
+probit_3 <- merged_menwomen %>% filter(ethnicity < 91, GEO_TD2004_2014 == 2) %>% glm(water_acc ~ ethnic_var + urb_status, data = ., family = binomial(link = "probit"))
+summary(probit_3)
+
+#negative significance 0.5
+
+probit_3 <- merged_menwomen %>% filter(ethnicity < 91, GEO_TD2004_2014 == 3) %>% glm(water_acc ~ ethnic_var + urb_status, data = ., family = binomial(link = "probit"))
+
+summary(probit_3)
+
+probit_3 <- merged_menwomen %>% filter(ethnicity < 91, GEO_TD2004_2014 == 4) %>% glm(water_acc ~ ethnic_var + urb_status, data = ., family = binomial(link = "probit"))
+
+summary(probit_3)
+
+probit_3 <- merged_menwomen %>% filter(ethnicity < 91, GEO_TD2004_2014 == 5) %>% glm(water_acc ~ ethnic_var + urb_status, data = ., family = binomial(link = "probit"))
+
+summary(probit_3)
+
+probit_3 <- merged_menwomen %>% filter(ethnicity < 91, GEO_TD2004_2014 == 6) %>% glm(water_acc ~ ethnic_var + urb_status, data = ., family = binomial(link = "probit"))
+
+summary(probit_3)
+
+merged_menwomen %>% group_by(ethnic_var, water_acc) %>% summarise(ratio = n()/nrow(.))
+
+merged_menwomen2 <- merged_menwomen %>% mutate(ethnic_var = case_when( ethnicity == "7" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr <= 30 ~ 1, TRUE ~ 0), urb_status = case_when(urban == "2" ~ 0, TRUE ~ 1))
+
+probit_zaghawa <- merged_menwomen2 %>% filter(ethnicity < 91) %>% glm(water_acc ~ ethnic_var , data = ., family = binomial(link = "probit"))
+
+summary(probit_zaghawa) 
+
+probit_zaghawa <- merged_menwomen2 %>% filter(ethnicity < 91) %>% glm(water_acc ~ ethnic_var + urb_status, data = ., family = binomial(link = "probit"))
+
+summary(probit_zaghawa) 
+```
+
+
+```{r}
+#Visualization on normal distribution
+
+#gorane + sara 
+
+merged_menwomen3 <- merged_menwomen %>% mutate(ethnic_var = case_when( ethnicity == "13" ~ 1, ethnicity == "1" ~ 1 ,  TRUE ~ 0 ), water_acc = case_when(timetowtr <= 30 ~ 1, TRUE ~ 0), urb_status = case_when(urban == "2" ~ 0, TRUE ~ 1))
+
+probit_gorane_sara <- merged_menwomen3 %>% filter(ethnicity < 91) %>% glm(water_acc ~ ethnic_var , data = ., family = binomial(link = "probit"))
+
+summary(probit_gorane_sara) 
+pnorm(0.45073+0.23555)
+
+z.out <- zelig(water_acc~ethnic_var,data=merged_menwomen,model="probit", cite=FALSE)
+# summary(z.out)
+# z.out <- setx(z.out, ethnic_var = 1)
+# z.out <- setx1(z.out, ethnic_var = 0)
+# 
+# summary(z.out)
+# s.out <- sim(z.out)
+# summary(s.out)
+
+z.out
+
+summary(z.out)
+#z.out <- setx(z.out, ethnicity = 13)
+#s.out <- sim(z.out)
+#summary(s.out)
+#plot(s.out)
+# 
+# s.out
+
+probit_gorane_sara_urb <- merged_menwomen3 %>% filter(ethnicity < 91) %>% glm(water_acc ~ ethnic_var + urb_status , data = ., family = binomial(link = "probit"))
+
+summary(probit_gorane_sara_urb)
+
+AIC(probit_gorane_sara, probit_gorane_sara_urb)
+pnorm(0.29511+0.24416)
+```
+
+
+```{r}
+
+merged_menwomen <- read_csv("../DHS_Data/men_women_merged.csv")
+merged_menwomen <- merged_menwomen %>% mutate(DRINKWTR = case_when(DRINKWTR == "1110" ~ "Dwelling", DRINKWTR == "2100" ~ "Unprotected/open well",
+DRINKWTR == "1120" ~ "yard/plot", 
+DRINKWTR == "1210" ~ "public tap", 
+DRINKWTR == "2200" ~ "protected well", 
+DRINKWTR == "2230" ~ "borehole", 
+DRINKWTR == "3110" ~ "protected spring/surface water", 
+DRINKWTR == "3120" ~ "unprotected spring/surface water", 
+DRINKWTR == "3200" ~ "River/dam/lake",
+DRINKWTR == "4000" ~ "rainwater", 
+DRINKWTR == "5100" ~ "tanker truck", 
+DRINKWTR == "5200" ~ "cart with small tank", 
+DRINKWTR == "5400" ~ "bottled water", 
+DRINKWTR == "6000" ~ "OTHER", TRUE ~ "Missing"))
+
+count_eth <- merged_menwomen %>% group_by(ethnicity) %>% summarise(count_total = n()) 
+
+count_water_eth<- merged_menwomen %>% filter(timetowtr <= 30) %>% group_by(ethnicity) %>% summarise(count_water = n()) 
+
+# left_join(count_eth, count_water_eth) %>% mutate(acc_p = count_water/count_total) %>% arrange(desc(acc_p)) %>% ggplot(.,aes(x = reorder(ethnicity,acc_p), y = acc_p)) + geom_bar(stat = "identity")
+ 
+
+# summary(merged_menwomen %>% glm(water_acc ~ as.factor(ethnicity) , data = ., family = binomial(link = "probit")))
+```
+
+
+```{r}
+probit_2014 <- merged_menwomen %>% mutate(water_acc = case_when(timetowtr <= 30 ~ 1, TRUE ~ 0)) %>% filter(ethnicity < 91) %>% glm(water_acc ~ as.factor(ethnicity), data = ., family = binomial(link = "probit"))
+avg_mean <- mean(probit_2014$coefficients)
+nrow <- as.numeric(merged_menwomen %>% filter(timetowtr <= 30) %>% group_by(ethnicity) %>% nrow())
+
+avg_sd <- sum(sqrt(diag(vcov(probit_2014))))/19
+
+population_mean <- 0.40513+0.46059
+population_sd <- 0.033
+
+#define upper and lower bound
+lower_bound <- population_mean - population_sd
+upper_bound <- population_mean + population_sd
+
+#Create a sequence of 1000 x values based on population mean and standard deviation
+x <- seq(-3, 3, length = 1000) * population_sd + population_mean
+
+#create a vector of values that shows the height of the probability distribution
+#for each value in x
+y <- dnorm(x, population_mean, population_sd)
+
+#plot normal distribution with customized x-axis labels
+plot(x,y, type = "l", lwd = 2, axes = FALSE, xlab = "", ylab = "")
+sd_axis_bounds = 5
+axis_bounds <- seq(-sd_axis_bounds * population_sd + population_mean,
+                    sd_axis_bounds * population_sd + population_mean,
+                    by = population_sd)
+axis(side = 1, at = axis_bounds, pos = 0)
+
+p1 <- ggplot(data = data.frame(x = c(0, 1)), aes(x)) +
+  stat_function(fun = dnorm, n = 1000, args = list(mean = population_mean, sd = population_sd), mapping = aes(fill = "Sara"), geom = "area", alpha = 0.6) + ylab("") +
+  scale_y_continuous(breaks = NULL) + 
+  stat_function(mapping = aes( fill = "Gorane"),
+                fun = dnorm, n = 1000, geom = "area", alpha = 0.6,
+                args = list(mean = pnorm(0.40513),
+                            sd = 0.02550)) +
+  stat_function(mapping = aes(fill = "Zaghawa"),
+                fun = dnorm,n=1000, geom = "area", alpha = 0.6,
+                args = list(mean = pnorm(0.40513-0.94054),
+                            sd = (0.05756)))  + 
+  #avg
+  stat_function(
+                fun = dnorm,n=1000, alpha = 0.8,
+                args = list(mean = pnorm(avg_mean),
+                            sd = (avg_sd))) +
+  theme_bw() + 
+  theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank()) + labs(x = "Probability of having access to water")
+
+
+
+
+p1
+ggsave("../Plots/distribution.png", p1)
+```
+
+Placebo test
+```{r}
+merged_menwomen10 <- read_csv("../DHS_Data/men_women_merged.csv")
+merged_menwomen10 <- merged_menwomen10 %>% mutate(DRINKWTR = case_when(DRINKWTR == "1110" ~ "Dwelling", DRINKWTR == "2100" ~ "Unprotected/open well",
+DRINKWTR == "1120" ~ "yard/plot", 
+DRINKWTR == "1210" ~ "public tap", 
+DRINKWTR == "2200" ~ "protected well", 
+DRINKWTR == "2230" ~ "borehole", 
+DRINKWTR == "3110" ~ "protected spring/surface water", 
+DRINKWTR == "3120" ~ "unprotected spring/surface water", 
+DRINKWTR == "3200" ~ "River/dam/lake",
+DRINKWTR == "4000" ~ "rainwater", 
+DRINKWTR == "5100" ~ "tanker truck", 
+DRINKWTR == "5200" ~ "cart with small tank", 
+DRINKWTR == "5400" ~ "bottled water", 
+DRINKWTR == "6000" ~ "OTHER", TRUE ~ "Missing"))
+
+merged_menwomen10 <- merged_menwomen10 %>% mutate(timetowtr = replace(timetowtr, timetowtr == "995", 0 )) %>% filter(timetowtr <= 360 & ethnicity <= 50)
+
+
+
+random_int <- function(){
+  set.seed(123)
+  first <- sample.int(19,1,replace = FALSE)
+  second <- sample.int(19,1,replace = FALSE)
+  print(first)
+  if (first == 7 || first == 1 || first == 13 ){
+    print("change number")
+    first <- sample.int(19,1,replace = FALSE)
+  }
+  if (second == 7 || second == 1 || second == 13 ){
+    print("change number")
+    second <- sample.int(19,1,replace = FALSE)
+  }
+  if (second == first){
+    second <- sample.int(19,1,replace = FALSE)
+  }
+  return(c(first,second))
+}
+
+fake_match <- random_int()
+merged_menwomen10 <- merged_menwomen10 %>% mutate(ethnic_var = case_when(ethnicity == as.character(fake_match[1]) ~ 1, ethnicity == as.character(fake_match[2]) ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr <= 30 ~ 1, TRUE ~ 0), urb_status = case_when(urban == "2" ~ 0, TRUE ~ 1)) 
+
+probit_fake <- merged_menwomen10 %>% filter(ethnicity < 91) %>% glm(water_acc ~ ethnic_var , data = ., family = binomial(link = "probit"))
+
+summary(probit_fake)
+
+```
+
+robust2 
+```{r}
+diarh<- read_csv("../DHS_Data/diarrhea.csv")
+
+diar_probit <- diarh %>% mutate(eth_var = case_when(ETHNICITYTD2 == "1" ~ 1, ETHNICITYTD2 == "13" ~ 1, TRUE ~ 0), diarh_condition = case_when(DIARRECENT == "20" ~ 1, DIARRECENT == "21" ~ 1,DIARRECENT == "22" ~ 1 , DIARRECENT == "23" ~ 1, TRUE ~ 0)) %>% filter(DIARRECENT <= 90) %>% glm(diarh_condition ~ eth_var , data = ., family = binomial(link = "probit"))
+
+summary(diar_probit)
+
+```
+

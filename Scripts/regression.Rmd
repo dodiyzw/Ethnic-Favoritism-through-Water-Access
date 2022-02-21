@@ -1,0 +1,231 @@
+---
+title: "Regression analysis"
+output: html_notebook
+---
+```{r}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(infer)
+```
+
+
+Loading and cleaning data 
+```{r}
+merged_menwomen <- read_csv("../DHS_Data/men_women_merged.csv")
+merged_menwomen <- merged_menwomen %>% mutate(DRINKWTR = case_when(DRINKWTR == "1110" ~ "Dwelling", DRINKWTR == "2100" ~ "Unprotected/open well",
+DRINKWTR == "1120" ~ "yard/plot", 
+DRINKWTR == "1210" ~ "public tap", 
+DRINKWTR == "2200" ~ "protected well", 
+DRINKWTR == "2230" ~ "borehole", 
+DRINKWTR == "3110" ~ "protected spring/surface water", 
+DRINKWTR == "3120" ~ "unprotected spring/surface water", 
+DRINKWTR == "3200" ~ "River/dam/lake",
+DRINKWTR == "4000" ~ "rainwater", 
+DRINKWTR == "5100" ~ "tanker truck", 
+DRINKWTR == "5200" ~ "cart with small tank", 
+DRINKWTR == "5400" ~ "bottled water", 
+DRINKWTR == "6000" ~ "OTHER", TRUE ~ "Missing"))
+
+merged_menwomen <- merged_menwomen %>% mutate(timetowtr = replace(timetowtr, timetowtr == "995", 0 )) %>% filter(timetowtr <= 360 & ethnicity <= 50)
+
+merged_menwomen <- merged_menwomen %>% mutate(timetowtr = replace(timetowtr, timetowtr == "995", 0 ))
+```
+
+Quick plot to see which ethnic group has most access to water
+```{r}
+merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr == 0 ~ 1, TRUE ~ 0)) %>% summarise(avg = mean(timetowtr), std = sd(timetowtr))
+
+ggplot(merged_menwomen, aes(x = factor(0), y = timetowtr)) + geom_boxplot()+ theme_bw()+
+   theme(axis.title.x=element_blank(),
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank()) 
+
+merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr == 0 ~ 1, TRUE ~ 0), highlight = case_when(ethnicity == "13" ~ "Sara", ethnicity == "7" ~ "Zaghawa", TRUE ~ "Others")) %>% filter(timetowtr < 360) %>% group_by(highlight, ethnicity) %>% summarise(time = mean(timetowtr)) %>% arrange(desc(time))%>% ggplot(., aes(x = reorder(ethnicity , time), y = time, fill = highlight)) + geom_bar(stat = "identity") + scale_fill_manual(breaks = c("Sara", "Zaghawa"), values = c('#595959', 'red', "blue")) + theme_bw() + labs(x = "Ethnicity", y = "average time to get water") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr == 0 ~ 1, TRUE ~ 0)) %>% group_by(ethnicity) %>% summarise(time = mean(timetowtr)) %>% arrange(desc(time))%>% ggplot(., aes(x = reorder(ethnicity , time), y = time, fill = factor(ifelse(ethnicity == "13", "Others", "Sara")))) + geom_bar(stat = "identity", show.legend = FALSE) + scale_fill_manual(name = "Ethnicity", values=c("red","grey50")) + theme_bw() + labs(x = "Ethnicity", y = "average time to get water") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr == 0 ~ 1, TRUE ~ 0)) %>% filter(urban == 2) %>%  group_by(ethnicity) %>% summarise(time = mean(timetowtr)) %>% arrange(desc(time))%>% ggplot(., aes(x = reorder(ethnicity , time), y = time, fill = factor(ifelse(ethnicity == "13", "Others", "Sara")))) + geom_bar(stat = "identity", show.legend = FALSE) + scale_fill_manual(name = "Ethnicity", values=c("red","grey50")) + theme_bw() + labs(x = "Ethnicity", y = "average time to get water (rural)")
+
+#Plot where there is water acccess, which we define to be time less than or equal to 40 minutes
+
+total_w_acc <- merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr == 0 ~ 1, TRUE ~ 0), highlight = case_when(ethnicity == "13" ~ "Sara", ethnicity == "7" ~ "Zaghawa", TRUE ~ "Others"))%>% filter(timetowtr <= 30 ) %>% filter(water_acc == 1 & ethnicity <= 50) %>% nrow(.)
+
+total_w_acc<- as.numeric(total_w_acc)
+
+merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr == 0 ~ 1, TRUE ~ 0), highlight = case_when(ethnicity == "13" ~ "Sara", ethnicity == "7" ~ "Zaghawa", ethnicity == "1" ~ "Gorane", TRUE ~ "Others"))%>% filter(timetowtr <= 30 ) %>% filter(water_acc == 1 & ethnicity <= 50) %>% group_by(highlight, ethnicity, water_acc) %>% summarise(count = n()) %>% arrange(desc(count))  %>% ggplot(., aes(x = reorder(ethnicity , count), y = count, fill = highlight)) + geom_bar(stat = "identity") + theme_bw() + scale_fill_manual(breaks = c("Sara", "Zaghawa"), values = c('#595959', 'red', "blue")) + labs(x = "Ethnicity", y = "# of respondents with access to water") +theme(text = element_text(size=14)) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
+merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr == 0 ~ 1, TRUE ~ 0)) %>% filter(timetowtr <= 40 ) %>% filter(water_acc == 1 & ethnicity <= 50 & urban == 2) %>% group_by(ethnicity, water_acc) %>% summarise(count = n()) %>% arrange(desc(count))  %>% ggplot(., aes(x = reorder(ethnicity , count), y = count, fill = factor(ifelse(ethnicity == "13", "Others", "Sara")))) + geom_bar(stat = "identity", show.legend = FALSE) + theme_bw()+ scale_fill_manual(name = "Ethnicity", values=c("red","grey50")) + labs(x = "Ethnicity", y = "# of respondents with access to water (rural)") +theme(text = element_text(size=14))
+
+#check what is this total 
+
+
+ethnic_count <- merged_menwomen %>% group_by(ethnicity) %>% summarise(total_eth = n())
+
+ethnic_w_water <- merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr == 0 ~ 1, TRUE ~ 0), highlight = case_when(ethnicity == "13" ~ "Sara", ethnicity == "7" ~ "Zaghawa", ethnicity == "1" ~ "Gorane", TRUE ~ "Others"))%>% filter(timetowtr <= 30 ) %>% filter(water_acc == 1 & ethnicity <= 50) %>% group_by(highlight, ethnicity, water_acc) %>% summarise(count = n())
+
+merged_water_access <- left_join(ethnic_w_water, ethnic_count)
+
+merged_water_access %>% mutate(ratio_water = count/total_eth) %>% arrange(desc(count))  %>% ggplot(., aes(x = reorder(ethnicity , ratio_water), y = ratio_water, fill = highlight)) + geom_bar(stat = "identity") + theme_bw() + scale_fill_manual(breaks = c("Sara", "Zaghawa","Gorane"), values = c("Green", '#595959', 'red', "blue")) + labs(x = "Ethnicity", y = "proportion of ethnic group having access to water") +theme(text = element_text(size=14)) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
+
+
+Test with on premise and ethnic group match
+```{r}
+probit_2 <- merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr <= 30 ~ 1, TRUE ~ 0)) %>% filter(ethnicity < 91) %>% glm(water_acc ~ as.factor(ethnicity), data = ., family = binomial(link = "probit"))
+
+summary(probit_2)
+pnorm(0.38957+0.47324) #Sara
+pnorm(0.58957 - 0.91852) #Zaghawa
+
+
+merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr <= 40 ~ 1, TRUE ~ 0)) %>% mutate(p = predict(probit_2, type = "response")) %>% select(ethnic_var, water_acc, p, ethnicity) %>% distinct(.) %>% filter(water_acc == 1) %>% arrange(desc(p)) %>% ggplot(.,aes(x = reorder(ethnicity,p), y = p, fill = factor(ifelse(ethnicity == "13", "Others", "Sara")))) + geom_bar(stat = "identity", show.legend = FALSE) + scale_fill_manual(name = "Ethnicity", values=c("red","grey50")) + theme_bw() + labs(x = "Ethnicity", y = "probability of having water access") + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
+mat <- as.data.frame(summary(probit_2)$coefficients)
+coefs <- mat[2:nrow(mat),1]
+
+merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr <= 40 ~ 1, TRUE ~ 0)) %>% mutate(p = probit_2$fitted.values) %>% select(ethnic_var, water_acc, p, ethnicity) %>% distinct(.) %>% ggplot(., aes(x = ethnicity, y = p)) + geom_point()
+
+
+
+merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr <= 40 ~ 1, TRUE ~ 0)) %>% filter(ethnicity == c("6","13")) %>% ggplot(., aes(x=factor(ethnicity), y=water_acc)) + geom_point() + stat_smooth(method="glm", method.args=list(family=binomial(link="probit"))) + theme_bw() + geom_jitter()
+
+merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr <= 40 ~ 1, TRUE ~ 0)) %>% filter(ethnicity == c("13","4")) %>% group_by(ethnic_var, water_acc) %>% summarise(count = n())
+
+merged_menwomen %>% filter(ethnicity == 13, timetowtr < 990) %>% summarise(time = mean(timetowtr, na.rm = TRUE))
+```
+
+```{r}
+ppp <- merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "13" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr <= 30 ~ 1, TRUE ~ 0)) %>% filter(ethnicity < 91 & urban == 1) %>% glm(water_acc ~ as.factor(ethnicity), data = ., family = binomial(link = "probit"))
+summary(ppp)
+```
+```{r}
+install.packages("Zelig")
+library(Zelig)
+
+df <- merged_menwomen %>% mutate(water_acc = case_when(timetowtr <= 30 ~ 1, TRUE ~ 0)) %>% filter(ethnicity < 91)
+
+summary(probit_2)
+pnorm(0.40513+0.46059)
+df <- na.omit(df)
+ethnic <- as.factor(df$ethnicity)
+glm.z.1 <- zelig(water_acc~ethnic,data=df,model="probit", cite=FALSE)
+summary(glm.z.1)
+pred.x <- setx(glm.z.1,ethnic = 13)
+s.out <- sim(glm.z.1,x=pred.x)
+summary(s.out)
+plot(s.out)
+
+merged_menwomen %>% filter(ethnicity == "13") %>% group_by(GEO_TD2004_2014) %>% summarise(count = n())
+
+df <- merged_menwomen %>% mutate(ethnic_var = case_when(ethnicity == "7" ~ 1, TRUE ~ 0 ), water_acc = case_when(timetowtr <= 40 ~ 1, TRUE ~ 0))
+
+
+df <- na.omit(df)
+ethnic <- as.factor(df$ethnicity)
+glm.z.1 <- zelig(water_acc~ethnic,data=df,model="probit", cite=FALSE)
+pred.x <- setx(glm.z.1,ethnic = 15)
+s.out <- sim(glm.z.1,x=pred.x)
+plot(s.out)
+
+# sara2014_region <- merged_menwomen %>% filter(ethnicity == "13") %>% group_by(GEO_TD2004_2014) %>% summarise(count = n()) %>% ggplot(., aes(x= GEO_TD2004_2014, y = count)) + geom_bar(stat = "identity")
+
+```
+
+```{r}
+merged_menwomen %>% filter(ethnicity == "13", timetowtr < 360) %>% summarise(avg_time = mean(timetowtr))
+
+match14 %>% filter(ethnicity == "13", timetowtr < 360) %>% summarise(avg_time = mean(as.numeric(timetowtr)))
+
+
+year <- c(1996, 2004,2014)
+time <- c(34.97, 20.77469, 25.16392)
+probability <- c(0.73, 0.48,0.805)
+
+year <- c(2004,2014)
+avg_time <- c( 20.77469, 25.16392)
+probability <- c(0.48,0.805)
+
+t <- data.frame(year,time,probability) %>% ggplot(.,aes(x = as.factor(year), y = avg_time)) + geom_bar(stat = "identity") + theme_bw() + labs(x = "years")
+
+pr <- data.frame(year,time,probability) %>% ggplot(.,aes(x = year, y = probability)) + geom_point() + theme_bw()
+
+t + pr
+
+```
+
+
+```{r}
+probit_2014 <- merged_menwomen %>% mutate(water_acc = case_when(timetowtr <= 30 ~ 1, TRUE ~ 0)) %>% filter(ethnicity < 91) %>% glm(water_acc ~ as.factor(ethnicity), data = ., family = binomial(link = "probit"))
+
+summary(probit_2014)
+
+
+
+### loading 04 ### 
+men04 <- read_csv("../DHS_Data/men04.csv")
+women04 <- read_csv("../DHS_Data/women04.csv")
+
+men04 <- men04 %>% select(URBANMN, GEO_TD2004_2014, ETHNICITYMN_TD, DRINKWTR, TIMETOWTRHH) %>% rename(., c(ethnicity = ETHNICITYMN_TD, timetowtr = TIMETOWTRHH, urban = URBANMN))
+
+women04 <- women04 %>% select(URBAN, GEO_TD2004_2014, ETHNICITYTD, DRINKWTR, TIMETOWTRIND) %>% rename(., c(ethnicity = ETHNICITYTD, timetowtr = TIMETOWTRIND, urban = URBAN))
+
+merged_04 <- rbind(men04, women04)
+
+probit_04 <- merged_04 %>% filter(ethnicity < 50)%>% mutate(water_acc = case_when(timetowtr <= 30 ~ 1, TRUE ~ 0))%>% glm(water_acc ~ as.factor(ethnicity), data = ., family = binomial(link = "probit"))
+
+
+```
+
+
+```{r}
+coefficient_14 <- probit_2014$coefficients
+intercept14 <- coefficient_14[1]
+coefficient_04 <- as.numeric(probit_04$coefficients)
+intercept04 <- coefficient_04[1]
+
+gorane14 <- c(round(pnorm(intercept14),digits = 3), "Gorane", "2014")
+gorane04 <- c(round(pnorm(intercept04),digits = 3), "Gorane", "2004")
+sara14 <- c(round(pnorm(intercept14 + coefficient_14[13]),digits = 3), "Sara", "2014")
+sara04 <- c(round(pnorm(intercept04 + coefficient_04[9]),digits = 3), "Sara", "2004")
+
+
+df0414 <- data.frame(rbind(gorane14, gorane04,sara14, sara04))
+
+colnames(df0414)[1] <- "probability"
+colnames(df0414)[2] <- "ethnicity"
+colnames(df0414)[3] <- "year"
+
+df0414 %>% ggplot(., aes(x = ethnicity, y = probability, fill = year)) + geom_bar(position = "dodge", stat = "identity") + theme_bw() + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + labs(y = "Probability of having access to water", x = "Ethnicity")
+
+
+length(coefficient_14)
+
+prob14 <- c()
+for (i in 2:length(coefficient_14))
+{
+  val <- as.numeric(pnorm(coefficient_14[i] + coefficient_14[1]))
+  prob14[[i]] <- val
+}
+
+prob14[[1]] <- pnorm(coefficient_14[1])
+dfff <- as.data.frame(prob14)
+colnames(dfff) <- c(1:length(prob14) )
+
+dfff <- data.table::melt(dfff)
+dfff$names <- rownames(dfff)
+
+p1 <- dfff %>% mutate(highlight = case_when(variable == "13" ~ "Sara", variable == "7" ~ "Zaghawa", variable == "1" ~ "Gorane", TRUE ~ "Others")) %>% ggplot(., aes(x = reorder(variable , value), y = value, fill = highlight)) + geom_bar(stat = "identity") + theme_bw() + scale_fill_manual(breaks = c("Sara", "Zaghawa","Gorane"), values = c("Green", '#595959', 'red', "blue")) + labs(x = "Ethnicity", y = "Probability of access to water") +theme(text = element_text(size=14)) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+ggsave("../Plots/ethnic_match.png", p1)
+
+merged_menwomen %>% filter(ethnicity == c("14","11","17","10","3"), timetowtr <= 30 ) %>% group_by(GEO_TD2004_2014, ethnicity) %>% summarise(count = n()) %>% ggplot(.,aes(x = as.factor(GEO_TD2004_2014), y = count, fill = as.factor(ethnicity))) + geom_bar(stat = "identity", position = "dodge") + theme_bw()
+
+merged_menwomen %>% filter(ethnicity == "1", timetowtr <= 30 ) %>% group_by(GEO_TD2004_2014, ethnicity) %>% summarise(count = n()) %>% ggplot(., aes(x = GEO_TD2004_2014, y = count)) + geom_bar(stat = "identity") + theme_bw()
+```
+
+
+
+
