@@ -1,7 +1,7 @@
 # Ethnic-Favoritism-through-Water-Access
 Study of ethnic favoritism by political leaders through water access in Chad. 
 
-## Note: 
+## Note 
 Datasets are obtained from the Demographic and Healths Survey (DHS), and is not uploaded here for privacy purposes. To obtain the dataset, one can register for an account on DHS. 
 
 This project explores whether there are preferential access to water in Chad based on an individual's ethnic group. An ethnic match is defined as having the same ethnic group as the ruling president.
