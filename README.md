@@ -18,3 +18,5 @@ This project conducted a probit regression analysis to see if there individuals 
 ## Limitation
 The work of this project in terms of the availability of dataset. DHS only publishes data once every 10 years, and hence the variability within years are hard to track.
 The ethnic composition in Chad is also complex, with some still practicing nomadic lifestyle. Hence, this makes drawing conclusion based on current available data difficult. 
+
+- All code and visualization were written in R. 
