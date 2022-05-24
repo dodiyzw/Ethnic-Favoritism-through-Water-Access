@@ -1,6 +1,8 @@
 # Ethnic-Favoritism-through-Water-Access
 Study of ethnic favoritism by political leaders through water access in Chad. 
 
+- All code and visualization were written in R. 
+
 ## Note 
 Datasets are obtained from the Demographic and Healths Survey (DHS), and is not uploaded here for privacy purposes. To obtain the dataset, one can register for an account on DHS. 
 
@@ -19,4 +21,4 @@ This project conducted a probit regression analysis to see if there individuals 
 The work of this project in terms of the availability of dataset. DHS only publishes data once every 10 years, and hence the variability within years are hard to track.
 The ethnic composition in Chad is also complex, with some still practicing nomadic lifestyle. Hence, this makes drawing conclusion based on current available data difficult. 
 
-- All code and visualization were written in R. 
+
